@@ -8,16 +8,15 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { 
   BarChart3, Upload, CheckCircle2, Sliders, Play, 
   Users, Target, ArrowRight, LayoutDashboard, Database,
-  AlertCircle, X, ExternalLink, Activity, KeyRound
+  AlertCircle, X, ExternalLink, Activity, KeyRound,
+  Edit2, Save, Filter
 } from 'lucide-react';
 
 // --- Fonts & Styles ---
-// Adicionando as fontes solicitadas e definindo classes utilitárias para as cores
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=DM+Sans:opsz,wght@9..40,100..1000&display=swap');
     
-    /* RESET AGRESSIVO DO VITE */
     :root {
       font-family: 'DM Sans', sans-serif;
       line-height: 1.5;
@@ -46,7 +45,6 @@ const GlobalStyles = () => (
       font-family: 'Bricolage Grotesque', sans-serif;
     }
 
-    /* Custom Scrollbar */
     ::-webkit-scrollbar {
       width: 8px;
     }
@@ -133,13 +131,170 @@ const normalizePriority = (p: string): Priority => {
 
 // --- Components ---
 
-// 0. Session Entry Component (NOVO)
+// 0. Initiative Detail Modal (NOVO: Card Detalhado + Edição de Voto)
+const InitiativeModal = ({ 
+  initiative, 
+  user, 
+  onClose, 
+  onVote 
+}: { 
+  initiative: Initiative, 
+  user: User, 
+  onClose: () => void, 
+  onVote: (id: string, impact: number, complexity: number) => void 
+}) => {
+  const userVote = initiative.votes.find(v => v.userId === user.uid);
+  const [isEditing, setIsEditing] = useState(false);
+  const [impact, setImpact] = useState(userVote?.impact || 50);
+  const [complexity, setComplexity] = useState(userVote?.complexity || 50);
+
+  const isDiretoria = user.team === 'Diretoria';
+  const isTeamOwner = user.team === initiative.team;
+
+  const handleSave = () => {
+    onVote(initiative.id, impact, complexity);
+    setIsEditing(false);
+    // Não fecha o modal automaticamente para dar feedback visual, 
+    // mas o usuário pode ver o voto atualizado.
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#09247c]/60 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-start">
+          <div>
+            <div className="flex gap-2 mb-2">
+              <span className="px-2 py-1 bg-[#09247c]/10 text-[#09247c] rounded text-xs font-bold uppercase">{initiative.team}</span>
+              <span className={`px-2 py-1 rounded text-xs font-bold border uppercase
+                ${initiative.priority === 'Alta' ? 'bg-red-50 text-red-700 border-red-200' : 
+                  initiative.priority === 'Média' ? 'bg-[#ffce00]/20 text-[#8d7041] border-[#ffce00]/40' : 
+                  'bg-green-50 text-green-700 border-green-200'}`}>
+                {initiative.priority}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-[#09247c] font-display leading-tight">{initiative.name}</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-[#8d7041] transition">
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+          <div className="bg-[#f8f9fa] p-4 rounded-xl border-l-4 border-[#ffce00]">
+            <span className="block text-xs font-bold text-[#8d7041] uppercase mb-1 tracking-wider">Objetivo</span>
+            <p className="font-medium text-[#09247c] text-lg">{initiative.objective}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[#f8f9fa] p-4 rounded-xl border border-slate-100">
+              <span className="block text-xs font-bold text-[#8d7041] uppercase mb-1 tracking-wider">Key Result</span>
+              <p className="font-medium text-[#09247c]">{initiative.keyResult}</p>
+            </div>
+            <div className="bg-[#f8f9fa] p-4 rounded-xl border border-slate-100">
+              <span className="block text-xs font-bold text-[#8d7041] uppercase mb-1 tracking-wider">Métrica</span>
+              <p className="font-medium text-[#09247c]">{initiative.metric}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Voting Footer */}
+        <div className="p-6 bg-[#f4f6f8] border-t border-slate-200">
+          {!userVote && !isEditing ? (
+            <div className="text-center">
+              <p className="text-[#8d7041] mb-4 font-medium">Você ainda não avaliou esta iniciativa.</p>
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="w-full bg-[#ffce00] text-[#09247c] py-3 rounded-xl font-bold shadow-md hover:bg-[#e6b800] transition flex items-center justify-center gap-2"
+              >
+                Avaliar Agora <Play size={18} fill="currentColor"/>
+              </button>
+            </div>
+          ) : !isEditing ? (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-sm font-bold text-[#09247c] uppercase flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-green-500"/> Seu Voto Registrado
+                </span>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="text-sm text-[#09247c] font-bold underline hover:text-[#ffce00] flex items-center gap-1"
+                >
+                  <Edit2 size={14}/> Alterar Voto
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 text-center">
+                  <span className="text-xs text-[#8d7041] uppercase font-bold">Impacto</span>
+                  <div className="text-xl font-bold text-[#09247c]">{userVote?.impact}</div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 text-center">
+                  <span className="text-xs text-[#8d7041] uppercase font-bold">Complexidade</span>
+                  <div className="text-xl font-bold text-[#09247c]">{userVote?.complexity}</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <label className="font-bold text-[#09247c] text-sm flex items-center gap-2">
+                    <Target size={16} /> Impacto
+                  </label>
+                  <span className="font-mono font-bold text-[#09247c]">{impact}</span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" 
+                  value={impact} onChange={(e) => setImpact(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#ffce00]"
+                />
+                {isDiretoria && <p className="text-[10px] text-[#8d7041] font-bold mt-1">Peso x2 (Diretoria)</p>}
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <label className="font-bold text-[#09247c] text-sm flex items-center gap-2">
+                    <Sliders size={16} /> Complexidade
+                  </label>
+                  <span className="font-mono font-bold text-[#09247c]">{complexity}</span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" 
+                  value={complexity} onChange={(e) => setComplexity(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#8d7041]"
+                />
+                {isTeamOwner && <p className="text-[10px] text-[#8d7041] font-bold mt-1">Peso x2 ({user.team})</p>}
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 bg-white border border-slate-300 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSave}
+                  className="flex-1 bg-[#09247c] text-white py-3 rounded-xl font-bold shadow-md hover:bg-[#061854] transition flex items-center justify-center gap-2"
+                >
+                  Salvar <Save size={18}/>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 0. Session Entry Component
 const SessionEntry = ({ onJoinSession }: { onJoinSession: (sessionId: string) => void }) => {
   const [sessionId, setSessionId] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Limpa o ID para garantir que seja uma string válida para URL/Firestore
     const cleanId = sessionId.trim().replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
     if (cleanId) onJoinSession(cleanId);
   };
@@ -147,7 +302,6 @@ const SessionEntry = ({ onJoinSession }: { onJoinSession: (sessionId: string) =>
   return (
     <div className="min-h-screen bg-[#09247c] flex items-center justify-center p-4 relative overflow-hidden">
       <GlobalStyles />
-      {/* Background Decor */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[#ffce00] opacity-10 rounded-full transform translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#8d7041] opacity-20 rounded-full transform -translate-x-1/2 translate-y-1/2 blur-3xl"></div>
 
@@ -251,16 +405,19 @@ const Dashboard = ({
   initiatives, 
   onStartVoting, 
   onViewMatrix,
-  onUploadCSV 
+  onUploadCSV,
+  onVote
 }: { 
   user: User, 
   sessionId: string,
   initiatives: Initiative[], 
   onStartVoting: () => void, 
   onViewMatrix: () => void,
-  onUploadCSV: (data: any[]) => void
+  onUploadCSV: (data: any[]) => void,
+  onVote: (id: string, impact: number, complexity: number) => void
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
 
   const stats = useMemo(() => {
     return {
@@ -444,7 +601,7 @@ const Dashboard = ({
         {/* Mini List */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-[#09247c]">
-            Resumo das Iniciativas
+            Resumo das Iniciativas (Clique para detalhes)
           </div>
           <div className="max-h-64 overflow-y-auto">
             {initiatives.length === 0 ? (
@@ -461,7 +618,11 @@ const Dashboard = ({
                 </thead>
                 <tbody>
                   {initiatives.map((i) => (
-                    <tr key={i.id} className="border-b border-slate-100 hover:bg-[#f8f9fa] transition-colors">
+                    <tr 
+                      key={i.id} 
+                      onClick={() => setSelectedInitiative(i)}
+                      className="border-b border-slate-100 hover:bg-[#ffce00]/10 transition-colors cursor-pointer"
+                    >
                       <td className="px-6 py-3 font-bold text-[#09247c]">{i.name}</td>
                       <td className="px-6 py-3"><span className="px-2 py-1 bg-[#09247c]/10 text-[#09247c] rounded text-xs font-bold">{i.team}</span></td>
                       <td className="px-6 py-3">
@@ -480,6 +641,16 @@ const Dashboard = ({
             )}
           </div>
         </div>
+
+        {/* Modal */}
+        {selectedInitiative && (
+          <InitiativeModal 
+            initiative={selectedInitiative}
+            user={user}
+            onClose={() => setSelectedInitiative(null)}
+            onVote={onVote}
+          />
+        )}
       </div>
     </div>
   );
@@ -516,7 +687,7 @@ const VotingSession = ({
   useEffect(() => {
     setImpact(50);
     setComplexity(50);
-  }, [currentItem]); 
+  }, [currentItem?.id]); // FIX: Só reseta se o ID mudar, não se o objeto for recriado
 
   const handleSubmitVote = () => {
     if (!currentItem) return;
@@ -660,6 +831,8 @@ const MatrixResult = ({
   onBack: () => void 
 }) => {
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
+  const [filterTeam, setFilterTeam] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
 
   // Calculate Weighted Scores
   const plottedData = useMemo(() => {
@@ -672,12 +845,10 @@ const MatrixResult = ({
       if (init.votes.length === 0) return null;
 
       init.votes.forEach(v => {
-        // Impact Logic: Diretoria x2
         const wImpact = v.userTeam === 'Diretoria' ? 2 : 1;
         totalImpact += v.impact * wImpact;
         impactWeightSum += wImpact;
 
-        // Complexity Logic: Team Owner x2
         const wComplexity = v.userTeam === init.team ? 2 : 1;
         totalComplexity += v.complexity * wComplexity;
         complexityWeightSum += wComplexity;
@@ -691,19 +862,59 @@ const MatrixResult = ({
     }).filter(Boolean) as (Initiative & { avgImpact: number, avgComplexity: number })[];
   }, [initiatives]);
 
+  // Aplicar Filtros
+  const filteredData = useMemo(() => {
+    return plottedData.filter(item => {
+      const matchTeam = filterTeam === 'all' || item.team === filterTeam;
+      const matchPriority = filterPriority === 'all' || item.priority === filterPriority;
+      return matchTeam && matchPriority;
+    });
+  }, [plottedData, filterTeam, filterPriority]);
+
   return (
     <div className="h-screen flex flex-col bg-[#f8f9fa] overflow-hidden">
       <GlobalStyles />
       {/* Header */}
-      <div className="bg-[#09247c] px-6 py-4 flex justify-between items-center shadow-md z-10 text-white">
-        <div className="flex items-center gap-4">
+      <div className="bg-[#09247c] px-6 py-4 flex flex-col md:flex-row justify-between items-center shadow-md z-10 text-white gap-4">
+        <div className="flex items-center gap-4 w-full md:w-auto">
            <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition">
              <ArrowRight className="rotate-180 text-[#ffce00]" />
            </button>
-           <h1 className="text-2xl font-bold font-display">Matriz Esforço x Impacto</h1>
+           <div>
+             <h1 className="text-xl font-bold font-display">Matriz Esforço x Impacto</h1>
+             <div className="text-xs text-[#ffce00]/80">
+               {filteredData.length} de {plottedData.length} iniciativas
+             </div>
+           </div>
         </div>
-        <div className="text-sm font-medium text-[#ffce00] bg-white/10 px-3 py-1 rounded-full">
-           {plottedData.length} iniciativas posicionadas
+
+        {/* Filtros */}
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative">
+            <select 
+              value={filterTeam}
+              onChange={(e) => setFilterTeam(e.target.value)}
+              className="appearance-none bg-[#061854] border border-[#09247c] text-white text-sm rounded-lg focus:ring-[#ffce00] focus:border-[#ffce00] block w-full p-2.5 pr-8 cursor-pointer"
+            >
+              <option value="all">Todos os Times</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <Filter size={14} className="absolute right-3 top-3 text-[#ffce00] pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <select 
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className="appearance-none bg-[#061854] border border-[#09247c] text-white text-sm rounded-lg focus:ring-[#ffce00] focus:border-[#ffce00] block w-full p-2.5 pr-8 cursor-pointer"
+            >
+              <option value="all">Todas Prioridades</option>
+              <option value="Alta">Alta</option>
+              <option value="Média">Média</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+            <Filter size={14} className="absolute right-3 top-3 text-[#ffce00] pointer-events-none" />
+          </div>
         </div>
       </div>
 
@@ -726,8 +937,8 @@ const MatrixResult = ({
               <div className="bg-red-50/30 flex items-end justify-end p-4 text-[#09247c]/10 font-bold text-4xl uppercase select-none font-display">Ingratas</div>
             </div>
 
-            {/* Plot Points */}
-            {plottedData.map(item => (
+            {/* Plot Points (Filtered) */}
+            {filteredData.map(item => (
               <button
                 key={item.id}
                 onClick={() => setSelectedInitiative(item)}
@@ -737,11 +948,7 @@ const MatrixResult = ({
                    bottom: `${item.avgImpact}%`
                 }}
               >
-                {/* MELHORIA: Cores Semânticas
-                  Alta -> Vermelho (red-500)
-                  Média -> Amarelo (yellow-400) com texto escuro para contraste
-                  Baixa -> Verde (green-500)
-                */}
+                {/* Cores Semânticas Reforçadas */}
                 <div className={`
                   w-8 h-8 rounded-full shadow-lg border-2 border-white 
                   flex items-center justify-center text-[10px] font-bold
@@ -826,7 +1033,7 @@ const MatrixResult = ({
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [sessionId, setSessionId] = useState<string>(''); // Novo estado para Sessão
+  const [sessionId, setSessionId] = useState<string>(''); 
   const [view, setView] = useState<'session' | 'login' | 'dashboard' | 'voting' | 'matrix'>('session');
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
@@ -845,7 +1052,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u) {
          setLoading(false);
-         // Tenta recuperar sessão e usuário do localStorage
          const savedSession = localStorage.getItem('prioriza_session_id');
          const savedUser = localStorage.getItem('prioriza_user');
          
@@ -863,11 +1069,10 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Data Listener (Depende do sessionId agora)
+  // Data Listener 
   useEffect(() => {
     if (!user || !sessionId) return;
 
-    // MELHORIA: Caminho do banco agora usa o sessionId para isolar dados
     const collRef = collection(db, 'artifacts', sessionId, 'public', 'data', 'initiatives');
     
     const unsubscribe = onSnapshot(collRef, (snapshot) => {
@@ -900,10 +1105,7 @@ export default function App() {
 
   const handleUploadCSV = async (data: any[]) => {
     if (!user || !sessionId) return;
-    
-    // Caminho dinâmico com sessionId
     const collRef = collection(db, 'artifacts', sessionId, 'public', 'data', 'initiatives');
-    
     for (const item of data) {
       await addDoc(collRef, item);
     }
@@ -911,6 +1113,10 @@ export default function App() {
 
   const handleVote = async (id: string, impact: number, complexity: number) => {
     if (!user || !sessionId) return;
+
+    // Encontra a iniciativa atual para poder atualizar
+    const initiative = initiatives.find(i => i.id === id);
+    if (!initiative) return;
 
     const vote: Vote = {
       userId: user.uid,
@@ -921,10 +1127,14 @@ export default function App() {
       timestamp: Date.now()
     };
 
-    // Caminho dinâmico com sessionId
+    // Lógica de Atualização (Substituição do voto anterior)
+    // Filtramos qualquer voto anterior deste usuário e adicionamos o novo
+    const updatedVotes = initiative.votes.filter(v => v.userId !== user.uid);
+    updatedVotes.push(vote);
+
     const docRef = doc(db, 'artifacts', sessionId, 'public', 'data', 'initiatives', id);
     await updateDoc(docRef, {
-      votes: arrayUnion(vote)
+      votes: updatedVotes
     });
   };
 
@@ -942,6 +1152,7 @@ export default function App() {
       onStartVoting={() => setView('voting')} 
       onViewMatrix={() => setView('matrix')}
       onUploadCSV={handleUploadCSV}
+      onVote={handleVote} // Passando a função atualizada para o Dashboard
     />
   );
 
