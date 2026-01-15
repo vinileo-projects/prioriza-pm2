@@ -233,26 +233,60 @@ const Dashboard = ({
     const reader = new FileReader();
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase()); // Simple CSV parse
       
-      // Expected structure: team, metric, objective, keyResult, priority, initiative
-      const parsedData = lines.slice(1).filter(l => l.trim()).map(line => {
-        // Handle commas inside quotes if simple split fails, but for simple MVP split by comma is standard
-        // A robust regex split for CSV:
-        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(','); 
-        const cleanValues = values.map(v => v.replace(/^"|"$/g, '').trim());
+      // Melhoria: Lida corretamente com quebras de linha Windows (\r\n) ou Unix (\n)
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      
+      if (lines.length < 2) {
+        alert("O arquivo parece vazio ou sem cabeçalho.");
+        return;
+      }
+      
+      // Melhoria 1: Detecta automaticamente o separador (Brasil usa muito ponto e vírgula)
+      const headerLine = lines[0];
+      const delimiter = headerLine.includes(';') ? ';' : ',';
 
-        // Basic mapping based on index assuming user follows template
-        // Or create object based on header mapping if strictly named
+      // Melhoria 2: Parser manual robusto que respeita aspas e espaços
+      const parseCSVLine = (line: string) => {
+        const values: string[] = [];
+        let current = '';
+        let insideQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            // Se encontrar aspas duplas ("") dentro de aspas, é uma aspa literal do Excel
+            if (insideQuotes && line[i + 1] === '"') {
+              current += '"';
+              i++; // Pula a próxima aspa
+            } else {
+              insideQuotes = !insideQuotes; // Entra ou sai do modo aspas
+            }
+          } else if (char === delimiter && !insideQuotes) {
+            // Se achou o separador e NÃO está entre aspas, fecha a coluna atual
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        values.push(current.trim()); // Empurra o último valor da linha
+        return values;
+      };
+      
+      const parsedData = lines.slice(1).map(line => {
+        const values = parseCSVLine(line);
+
+        // Mapeamento baseado no índice (assumindo ordem do template: Team, Metric, Obj, KR, Prio, Name)
         return {
-          team: cleanValues[0] || 'Geral',
-          metric: cleanValues[1] || 'N/A',
-          objective: cleanValues[2] || 'N/A',
-          keyResult: cleanValues[3] || 'N/A',
-          priority: normalizePriority(cleanValues[4] || 'Baixa'),
-          name: cleanValues[5] || 'Iniciativa sem nome',
-          description: cleanValues[5] || '', // FIX: Garante string vazia se undefined
+          team: values[0] || 'Geral',
+          metric: values[1] || 'N/A',
+          objective: values[2] || 'N/A',
+          keyResult: values[3] || 'N/A',
+          priority: normalizePriority(values[4] || 'Baixa'),
+          name: values[5] || 'Iniciativa sem nome',
+          description: values[5] || '', 
           votes: []
         };
       });
