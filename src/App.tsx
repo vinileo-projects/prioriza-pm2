@@ -9,7 +9,7 @@ import {
   BarChart3, Upload, CheckCircle2, Sliders, Play, 
   Users, Target, ArrowRight, LayoutDashboard, Database,
   AlertCircle, X, ExternalLink, Activity, KeyRound,
-  Edit2, Save, Filter
+  Edit2, Save, Filter, FileText, Download
 } from 'lucide-react';
 
 // --- Fonts & Styles ---
@@ -131,7 +131,175 @@ const normalizePriority = (p: string): Priority => {
 
 // --- Components ---
 
-// 0. Initiative Detail Modal (NOVO: Card Detalhado + Edição de Voto)
+// 5. Export Screen Component (NOVO)
+const ExportScreen = ({ 
+  initiatives, 
+  onBack 
+}: { 
+  initiatives: Initiative[], 
+  onBack: () => void 
+}) => {
+  const [impactCutoff, setImpactCutoff] = useState(50); // Ponto de corte padrão
+
+  const processedData = useMemo(() => {
+    // 1. Calcular Médias Ponderadas
+    const withAverages = initiatives.map(init => {
+      let totalImpact = 0;
+      let totalComplexity = 0;
+      let impactWeightSum = 0;
+      let complexityWeightSum = 0;
+
+      if (init.votes.length === 0) return null;
+
+      init.votes.forEach(v => {
+        const wImpact = v.userTeam === 'Diretoria' ? 2 : 1;
+        totalImpact += v.impact * wImpact;
+        impactWeightSum += wImpact;
+
+        const wComplexity = v.userTeam === init.team ? 2 : 1;
+        totalComplexity += v.complexity * wComplexity;
+        complexityWeightSum += wComplexity;
+      });
+
+      return {
+        ...init,
+        avgImpact: totalImpact / impactWeightSum,
+        avgComplexity: totalComplexity / complexityWeightSum
+      };
+    }).filter(Boolean) as (Initiative & { avgImpact: number, avgComplexity: number })[];
+
+    // 2. Filtrar pelo Corte de Impacto
+    const filtered = withAverages.filter(item => item.avgImpact >= impactCutoff);
+
+    // 3. Ordenar: Impacto Decrescente -> Complexidade Crescente
+    return filtered.sort((a, b) => {
+      const impactDiff = b.avgImpact - a.avgImpact; // Maior impacto primeiro
+      if (Math.abs(impactDiff) > 0.01) return impactDiff; // Se impacto for diferente
+      return a.avgComplexity - b.avgComplexity; // Menor complexidade (desempate)
+    });
+  }, [initiatives, impactCutoff]);
+
+  const handleCopyToClipboard = () => {
+    const header = "Pos\tIniciativa\tTime\tImpacto\tComplexidade\n";
+    const rows = processedData.map((i, idx) => 
+      `${idx + 1}\t${i.name}\t${i.team}\t${i.avgImpact.toFixed(1)}\t${i.avgComplexity.toFixed(1)}`
+    ).join('\n');
+    
+    // Fallback simples para copiar
+    const textArea = document.createElement("textarea");
+    textArea.value = header + rows;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy'); // Comando antigo mas mais compatível com iframe
+    document.body.removeChild(textArea);
+    
+    alert("Lista copiada! Cole no Excel ou Sheets.");
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8f9fa] pb-12 flex flex-col">
+      <GlobalStyles />
+      {/* Header */}
+      <div className="bg-[#09247c] px-6 py-4 flex justify-between items-center shadow-md z-10 text-white">
+        <div className="flex items-center gap-4">
+           <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition">
+             <ArrowRight className="rotate-180 text-[#ffce00]" />
+           </button>
+           <h1 className="text-xl font-bold font-display">Exportação Priorizada</h1>
+        </div>
+      </div>
+
+      <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
+        {/* Controls */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex flex-col md:flex-row gap-8 items-end">
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-bold text-[#09247c] mb-2 flex justify-between items-center">
+                <span className="flex items-center gap-2"><Filter size={16}/> Nota de Corte (Impacto Mínimo)</span>
+                <span className="text-[#ffce00] bg-[#09247c] px-3 py-1 rounded font-mono font-bold">{impactCutoff}</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={impactCutoff}
+                onChange={(e) => setImpactCutoff(Number(e.target.value))}
+                className="w-full h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#09247c]"
+              />
+              <div className="flex justify-between text-xs text-slate-400 mt-2 font-medium">
+                <span>0 (Mostrar Tudo)</span>
+                <span>100 (Mais Rigoroso)</span>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleCopyToClipboard}
+              className="bg-[#ffce00] hover:bg-[#e6b800] text-[#09247c] px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-md whitespace-nowrap active:scale-95"
+            >
+              <FileText size={18} /> Copiar Tabela
+            </button>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+             <span className="font-bold text-[#09247c]">Ranking Final ({processedData.length})</span>
+             <span className="text-xs text-[#8d7041] bg-[#ffce00]/20 px-2 py-1 rounded border border-[#ffce00]/30 font-bold">
+               Ordenação: Impacto (Maior) → Complexidade (Menor)
+             </span>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-[#8d7041] uppercase bg-slate-50 border-b border-slate-100 font-bold tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 text-center w-16">#</th>
+                  <th className="px-6 py-3">Iniciativa</th>
+                  <th className="px-6 py-3">Time</th>
+                  <th className="px-6 py-3 text-center">Impacto (Avg)</th>
+                  <th className="px-6 py-3 text-center">Complexidade (Avg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-medium">
+                      Nenhuma iniciativa atinge a nota de corte de {impactCutoff}.<br/>
+                      Tente diminuir a régua de corte.
+                    </td>
+                  </tr>
+                ) : (
+                  processedData.map((item, index) => (
+                    <tr key={item.id} className="border-b border-slate-50 hover:bg-[#f8f9fa] transition-colors">
+                      <td className="px-6 py-4 font-bold text-[#09247c]/40 text-center text-lg">{index + 1}</td>
+                      <td className="px-6 py-4 font-bold text-[#09247c] text-base">{item.name}</td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 bg-slate-100 rounded text-xs font-semibold text-slate-600 uppercase">{item.team}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="bg-[#09247c]/10 text-[#09247c] px-3 py-1 rounded-full font-bold">
+                          {item.avgImpact.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="bg-[#8d7041]/10 text-[#8d7041] px-3 py-1 rounded-full font-bold">
+                          {item.avgComplexity.toFixed(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 0. Initiative Detail Modal
 const InitiativeModal = ({ 
   initiative, 
   user, 
@@ -154,8 +322,6 @@ const InitiativeModal = ({
   const handleSave = () => {
     onVote(initiative.id, impact, complexity);
     setIsEditing(false);
-    // Não fecha o modal automaticamente para dar feedback visual, 
-    // mas o usuário pode ver o voto atualizado.
   };
 
   return (
@@ -405,6 +571,7 @@ const Dashboard = ({
   initiatives, 
   onStartVoting, 
   onViewMatrix,
+  onViewExport,
   onUploadCSV,
   onVote
 }: { 
@@ -413,6 +580,7 @@ const Dashboard = ({
   initiatives: Initiative[], 
   onStartVoting: () => void, 
   onViewMatrix: () => void,
+  onViewExport: () => void,
   onUploadCSV: (data: any[]) => void,
   onVote: (id: string, impact: number, complexity: number) => void
 }) => {
@@ -525,13 +693,20 @@ const Dashboard = ({
               onClick={() => fileInputRef.current?.click()}
               className="bg-white border-2 border-[#8d7041]/20 text-[#8d7041] px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#8d7041]/10 transition font-bold"
             >
-              <Upload size={18} /> Upload CSV
+              <Upload size={18} /> CSV
             </button>
             <button 
                onClick={onViewMatrix}
                className="bg-[#09247c] hover:bg-[#061854] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition font-bold shadow-lg shadow-[#09247c]/20"
             >
                <LayoutDashboard size={18} /> Ver Matriz
+            </button>
+            {/* NOVO BOTÃO DE EXPORTAÇÃO */}
+            <button 
+               onClick={onViewExport}
+               className="bg-[#8d7041] hover:bg-[#6b5531] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition font-bold shadow-lg shadow-[#8d7041]/20"
+            >
+               <Download size={18} /> Exportar
             </button>
           </div>
         </header>
@@ -844,6 +1019,7 @@ const MatrixResult = ({
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
   const [filterTeam, setFilterTeam] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [isNormalized, setIsNormalized] = useState(true); // Estado para controlar o modo de visualização
 
   // Calculate Weighted Scores
   const plottedData = useMemo(() => {
@@ -882,8 +1058,11 @@ const MatrixResult = ({
     });
   }, [plottedData, filterTeam, filterPriority]);
 
-  // Lógica de Normalização (Zoom Relativo)
+  // Lógica de Normalização (Zoom Relativo ou Absoluto)
   const normalization = useMemo(() => {
+    // Se o modo normalizado estiver desligado, usa escala fixa 0-100
+    if (!isNormalized) return { minI: 0, maxI: 100, minC: 0, maxC: 100 };
+
     if (filteredData.length === 0) return { minI: 0, maxI: 100, minC: 0, maxC: 100 };
 
     const impacts = filteredData.map(d => d.avgImpact);
@@ -895,7 +1074,7 @@ const MatrixResult = ({
       minC: Math.min(...complexities),
       maxC: Math.max(...complexities)
     };
-  }, [filteredData]);
+  }, [filteredData, isNormalized]);
 
   const getNormalizedPosition = (val: number, min: number, max: number) => {
     if (max === min) return 50; // Centraliza se todos forem iguais
@@ -907,21 +1086,38 @@ const MatrixResult = ({
     <div className="h-screen flex flex-col bg-[#f8f9fa] overflow-hidden">
       <GlobalStyles />
       {/* Header */}
-      <div className="bg-[#09247c] px-6 py-4 flex flex-col md:flex-row justify-between items-center shadow-md z-10 text-white gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
+      <div className="bg-[#09247c] px-6 py-4 flex flex-col xl:flex-row justify-between items-center shadow-md z-10 text-white gap-4">
+        <div className="flex items-center gap-4 w-full xl:w-auto">
            <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition">
              <ArrowRight className="rotate-180 text-[#ffce00]" />
            </button>
            <div>
              <h1 className="text-xl font-bold font-display">Matriz Esforço x Impacto</h1>
              <div className="text-xs text-[#ffce00]/80">
-               {filteredData.length} de {plottedData.length} iniciativas (Vista Normalizada)
+               {filteredData.length} de {plottedData.length} iniciativas
              </div>
            </div>
         </div>
 
-        {/* Filtros */}
-        <div className="flex gap-3 w-full md:w-auto">
+        {/* Controles e Filtros */}
+        <div className="flex flex-wrap xl:flex-nowrap gap-3 w-full xl:w-auto items-center justify-end">
+          
+          {/* Toggle de Visualização */}
+          <div className="bg-[#061854] border border-[#09247c] p-1 rounded-lg flex items-center">
+            <button
+              onClick={() => setIsNormalized(false)}
+              className={`px-3 py-1.5 text-xs font-bold rounded transition ${!isNormalized ? 'bg-[#ffce00] text-[#09247c]' : 'text-slate-400 hover:text-white'}`}
+            >
+              Absoluta
+            </button>
+            <button
+              onClick={() => setIsNormalized(true)}
+              className={`px-3 py-1.5 text-xs font-bold rounded transition ${isNormalized ? 'bg-[#ffce00] text-[#09247c]' : 'text-slate-400 hover:text-white'}`}
+            >
+              Relativa
+            </button>
+          </div>
+
           <div className="relative">
             <select 
               value={filterTeam}
@@ -957,14 +1153,18 @@ const MatrixResult = ({
           {/* Chart Container */}
           <div className="relative w-[800px] h-[600px] border-l-4 border-b-4 border-[#09247c]">
             
-            {/* Axis Labels - Agora indicando que é relativo */}
+            {/* Axis Labels */}
             <div className="absolute -left-12 top-1/2 -rotate-90 font-bold text-[#09247c] tracking-widest text-sm font-display text-center">
               IMPACTO<br/>
-              <span className="text-[10px] opacity-50">({normalization.minI.toFixed(1)} - {normalization.maxI.toFixed(1)})</span>
+              <span className="text-[10px] opacity-50 font-mono">
+                ({normalization.minI.toFixed(0)} - {normalization.maxI.toFixed(0)})
+              </span>
             </div>
             <div className="absolute bottom-[-45px] left-1/2 font-bold text-[#09247c] tracking-widest text-sm font-display text-center transform -translate-x-1/2">
-              COMPLEXIDADE (Esforço)<br/>
-              <span className="text-[10px] opacity-50">({normalization.minC.toFixed(1)} - {normalization.maxC.toFixed(1)})</span>
+              COMPLEXIDADE<br/>
+              <span className="text-[10px] opacity-50 font-mono">
+                ({normalization.minC.toFixed(0)} - {normalization.maxC.toFixed(0)})
+              </span>
             </div>
 
             {/* Quadrant Backgrounds */}
@@ -994,7 +1194,7 @@ const MatrixResult = ({
                   {/* Cores Semânticas Reforçadas */}
                   <div className={`
                     w-8 h-8 rounded-full shadow-lg border-2 border-white 
-                    flex items-center justify-center text-[10px] font-bold
+                    flex items-center justify-center text-[10px] font-bold transition-transform group-hover:scale-110
                     ${item.priority === 'Alta' ? 'bg-red-500 text-white' : 
                       item.priority === 'Média' ? 'bg-yellow-400 text-slate-900' : 
                       'bg-green-500 text-white'}
@@ -1005,8 +1205,9 @@ const MatrixResult = ({
                   {/* Tooltip on Hover */}
                   <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-48 bg-[#09247c] text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center font-bold shadow-xl">
                     {item.name}
-                    <div className="text-[10px] font-normal opacity-80 mt-1">
-                      Imp: {item.avgImpact.toFixed(1)} | Cplx: {item.avgComplexity.toFixed(1)}
+                    <div className="text-[10px] font-normal opacity-80 mt-1 flex justify-center gap-2">
+                      <span>Imp: {item.avgImpact.toFixed(1)}</span>
+                      <span>Cplx: {item.avgComplexity.toFixed(1)}</span>
                     </div>
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#09247c] rotate-45"></div>
                   </div>
@@ -1081,7 +1282,7 @@ const MatrixResult = ({
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [sessionId, setSessionId] = useState<string>(''); 
-  const [view, setView] = useState<'session' | 'login' | 'dashboard' | 'voting' | 'matrix'>('session');
+  const [view, setView] = useState<'session' | 'login' | 'dashboard' | 'voting' | 'matrix' | 'export'>('session');
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1198,8 +1399,16 @@ export default function App() {
       initiatives={initiatives} 
       onStartVoting={() => setView('voting')} 
       onViewMatrix={() => setView('matrix')}
+      onViewExport={() => setView('export')}
       onUploadCSV={handleUploadCSV}
       onVote={handleVote} // Passando a função atualizada para o Dashboard
+    />
+  );
+
+  if (view === 'export' && user) return (
+    <ExportScreen 
+      initiatives={initiatives} 
+      onBack={() => setView('dashboard')} 
     />
   );
 
