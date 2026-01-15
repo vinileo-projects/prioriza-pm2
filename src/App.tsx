@@ -17,8 +17,29 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=DM+Sans:opsz,wght@9..40,100..1000&display=swap');
     
-    body {
+    /* RESET AGRESSIVO DO VITE (Para corrigir o problema de visualização) */
+    :root {
       font-family: 'DM Sans', sans-serif;
+      line-height: 1.5;
+      font-weight: 400;
+    }
+
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      display: block !important; /* Vite força flex, aqui removemos */
+      place-items: unset !important; /* Vite força centralização, aqui removemos */
+      min-width: 100vw !important;
+      min-height: 100vh !important;
+      background-color: #f8f9fa;
+    }
+
+    #root {
+      max-width: none !important; /* Vite limita a largura em 1280px, aqui liberamos */
+      margin: 0 !important;
+      padding: 0 !important;
+      text-align: left !important;
+      width: 100%;
     }
     
     h1, h2, h3, h4, h5, h6, .font-display {
@@ -43,7 +64,7 @@ const GlobalStyles = () => (
 );
 
 // --- Firebase Configuration ---
-// Substitua o bloco antigo por este:
+// SUAS CONFIGURAÇÕES REAIS (Já inseridas)
 const firebaseConfig = {
   apiKey: "AIzaSyA8yzP_K7eifW-kfB08ca9G_l6fUflV8DQ",
   authDomain: "prioriza-pm.firebaseapp.com",
@@ -54,7 +75,6 @@ const firebaseConfig = {
   measurementId: "G-G5Q6FVDTXQ"
 };
 
-// Defina um ID para agrupar seus dados (pode ser qualquer nome)
 const appId = 'prioriza-pm-oficial';
 
 // Initialize Firebase
@@ -232,7 +252,7 @@ const Dashboard = ({
           keyResult: cleanValues[3] || 'N/A',
           priority: normalizePriority(cleanValues[4] || 'Baixa'),
           name: cleanValues[5] || 'Iniciativa sem nome',
-          description: cleanValues[5], // Using name as description for simplicity if no extra col
+          description: cleanValues[5] || '', // FIX: Garante string vazia se undefined
           votes: []
         };
       });
