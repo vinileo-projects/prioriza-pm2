@@ -462,24 +462,21 @@ const VotingSession = ({
       });
   }, [initiatives, user]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // FIX: Removido estado de índice. Como a queue remove itens votados, sempre pegamos o primeiro.
   const [impact, setImpact] = useState(50);
   const [complexity, setComplexity] = useState(50);
 
-  const currentItem = queue[currentIndex];
+  const currentItem = queue[0];
 
   useEffect(() => {
     setImpact(50);
     setComplexity(50);
-  }, [currentIndex, currentItem]); // Reset sliders on new item
+  }, [currentItem]); // Reset sliders on new item
 
   const handleSubmitVote = () => {
     if (!currentItem) return;
     onVote(currentItem.id, impact, complexity);
-    if (currentIndex < queue.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } 
-    // If it was the last one, the queue will be empty on re-render or we handle "Done" state
+    // FIX: Não incrementamos índice manualmente, pois o item sairá da queue automaticamente ao receber o voto
   };
 
   if (!currentItem) {
@@ -514,7 +511,7 @@ const VotingSession = ({
             <X size={20} /> Cancelar
           </button>
           <div className="text-sm font-bold text-[#09247c] bg-white px-4 py-2 rounded-full shadow-sm">
-            {queue.length - currentIndex} restantes
+            {queue.length} restantes
           </div>
         </div>
 
