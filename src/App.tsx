@@ -613,29 +613,40 @@ const Dashboard = ({
                     <th className="px-6 py-3">Iniciativa</th>
                     <th className="px-6 py-3">Time</th>
                     <th className="px-6 py-3">Prio Origem</th>
-                    <th className="px-6 py-3">Votos</th>
+                    <th className="px-6 py-3 text-center">Seu Impacto</th>
+                    <th className="px-6 py-3 text-center">Sua Complexidade</th>
+                    <th className="px-6 py-3 text-center">Votos</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {initiatives.map((i) => (
-                    <tr 
-                      key={i.id} 
-                      onClick={() => setSelectedInitiative(i)}
-                      className="border-b border-slate-100 hover:bg-[#ffce00]/10 transition-colors cursor-pointer"
-                    >
-                      <td className="px-6 py-3 font-bold text-[#09247c]">{i.name}</td>
-                      <td className="px-6 py-3"><span className="px-2 py-1 bg-[#09247c]/10 text-[#09247c] rounded text-xs font-bold">{i.team}</span></td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2 py-1 rounded text-xs font-bold border
-                          ${i.priority === 'Alta' ? 'bg-red-50 text-red-700 border-red-200' : 
-                            i.priority === 'Média' ? 'bg-[#ffce00]/20 text-[#8d7041] border-[#ffce00]/40' : 
-                            'bg-green-50 text-green-700 border-green-200'}`}>
-                          {i.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-[#8d7041] font-medium">{i.votes.length}</td>
-                    </tr>
-                  ))}
+                  {initiatives.map((i) => {
+                    const myVote = i.votes.find(v => v.userId === user.uid);
+                    return (
+                      <tr 
+                        key={i.id} 
+                        onClick={() => setSelectedInitiative(i)}
+                        className="border-b border-slate-100 hover:bg-[#ffce00]/10 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-3 font-bold text-[#09247c]">{i.name}</td>
+                        <td className="px-6 py-3"><span className="px-2 py-1 bg-[#09247c]/10 text-[#09247c] rounded text-xs font-bold">{i.team}</span></td>
+                        <td className="px-6 py-3">
+                          <span className={`px-2 py-1 rounded text-xs font-bold border
+                            ${i.priority === 'Alta' ? 'bg-red-50 text-red-700 border-red-200' : 
+                              i.priority === 'Média' ? 'bg-[#ffce00]/20 text-[#8d7041] border-[#ffce00]/40' : 
+                              'bg-green-50 text-green-700 border-green-200'}`}>
+                            {i.priority}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-center font-bold text-[#09247c]">
+                          {myVote ? myVote.impact : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="px-6 py-3 text-center font-bold text-[#09247c]">
+                          {myVote ? myVote.complexity : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="px-6 py-3 text-center text-[#8d7041] font-medium">{i.votes.length}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
