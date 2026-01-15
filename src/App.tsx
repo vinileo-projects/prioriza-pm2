@@ -8,7 +8,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { 
   BarChart3, Upload, CheckCircle2, Sliders, Play, 
   Users, Target, ArrowRight, LayoutDashboard, Database,
-  AlertCircle, X, ExternalLink, Activity
+  AlertCircle, X, ExternalLink, Activity, KeyRound
 } from 'lucide-react';
 
 // --- Fonts & Styles ---
@@ -17,7 +17,7 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=DM+Sans:opsz,wght@9..40,100..1000&display=swap');
     
-    /* RESET AGRESSIVO DO VITE (Para corrigir o problema de visualização) */
+    /* RESET AGRESSIVO DO VITE */
     :root {
       font-family: 'DM Sans', sans-serif;
       line-height: 1.5;
@@ -27,15 +27,15 @@ const GlobalStyles = () => (
     body {
       margin: 0 !important;
       padding: 0 !important;
-      display: block !important; /* Vite força flex, aqui removemos */
-      place-items: unset !important; /* Vite força centralização, aqui removemos */
+      display: block !important; 
+      place-items: unset !important; 
       min-width: 100vw !important;
       min-height: 100vh !important;
       background-color: #f8f9fa;
     }
 
     #root {
-      max-width: none !important; /* Vite limita a largura em 1280px, aqui liberamos */
+      max-width: none !important;
       margin: 0 !important;
       padding: 0 !important;
       text-align: left !important;
@@ -64,7 +64,6 @@ const GlobalStyles = () => (
 );
 
 // --- Firebase Configuration ---
-// SUAS CONFIGURAÇÕES REAIS (Já inseridas)
 const firebaseConfig = {
   apiKey: "AIzaSyA8yzP_K7eifW-kfB08ca9G_l6fUflV8DQ",
   authDomain: "prioriza-pm.firebaseapp.com",
@@ -74,8 +73,6 @@ const firebaseConfig = {
   appId: "1:212753563965:web:32e5827854613f7b558554",
   measurementId: "G-G5Q6FVDTXQ"
 };
-
-const appId = 'prioriza-pm-oficial';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -136,8 +133,61 @@ const normalizePriority = (p: string): Priority => {
 
 // --- Components ---
 
+// 0. Session Entry Component (NOVO)
+const SessionEntry = ({ onJoinSession }: { onJoinSession: (sessionId: string) => void }) => {
+  const [sessionId, setSessionId] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Limpa o ID para garantir que seja uma string válida para URL/Firestore
+    const cleanId = sessionId.trim().replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+    if (cleanId) onJoinSession(cleanId);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#09247c] flex items-center justify-center p-4 relative overflow-hidden">
+      <GlobalStyles />
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#ffce00] opacity-10 rounded-full transform translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#8d7041] opacity-20 rounded-full transform -translate-x-1/2 translate-y-1/2 blur-3xl"></div>
+
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10">
+        <div className="flex justify-center mb-6">
+          <div className="bg-[#f8f9fa] p-4 rounded-full shadow-inner">
+            <KeyRound className="text-[#09247c] w-10 h-10" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-center text-[#09247c] mb-2 font-display">Bem-vindo</h1>
+        <p className="text-center text-[#8d7041] mb-8 font-medium">Digite o ID da sessão para começar ou crie um novo.</p>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-[#09247c] mb-1">ID da Sessão</label>
+            <input 
+              type="text" 
+              required
+              className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-0 focus:border-[#ffce00] outline-none transition text-[#09247c] font-bold text-lg text-center tracking-widest uppercase placeholder:normal-case placeholder:tracking-normal placeholder:font-normal"
+              placeholder="Ex: planning-q1"
+              value={sessionId}
+              onChange={(e) => setSessionId(e.target.value)}
+            />
+            <p className="text-xs text-slate-400 mt-2 text-center">Compartilhe este mesmo ID com seu time.</p>
+          </div>
+
+          <button 
+            type="submit"
+            className="w-full bg-[#ffce00] hover:bg-[#e6b800] text-[#09247c] font-bold py-4 rounded-xl transition-transform active:scale-[0.98] duration-200 flex items-center justify-center gap-2 shadow-[0_4px_0_#b89500] hover:shadow-[0_2px_0_#b89500] hover:translate-y-[2px]"
+          >
+            Acessar Sessão <ArrowRight size={20} strokeWidth={3} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // 1. Login Component
-const Login = ({ onLogin }: { onLogin: (name: string, team: Team) => void }) => {
+const Login = ({ sessionId, onLogin }: { sessionId: string, onLogin: (name: string, team: Team) => void }) => {
   const [name, setName] = useState('');
   const [team, setTeam] = useState<Team>('Produtos');
 
@@ -156,9 +206,9 @@ const Login = ({ onLogin }: { onLogin: (name: string, team: Team) => void }) => 
           </div>
         </div>
         <h1 className="text-3xl font-bold text-center text-[#09247c] mb-2 font-display">PriorizaPM</h1>
-        <p className="text-center text-[#8d7041] mb-8 font-medium">Dinamica de Priorização de Produto</p>
+        <p className="text-center text-[#8d7041] mb-2 font-medium">Sessão: <span className="font-bold bg-[#ffce00]/20 px-2 py-0.5 rounded text-[#09247c]">{sessionId}</span></p>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div>
             <label className="block text-sm font-bold text-[#09247c] mb-1">Seu Nome</label>
             <input 
@@ -197,12 +247,14 @@ const Login = ({ onLogin }: { onLogin: (name: string, team: Team) => void }) => 
 // 2. Dashboard Component
 const Dashboard = ({ 
   user, 
+  sessionId,
   initiatives, 
   onStartVoting, 
   onViewMatrix,
   onUploadCSV 
 }: { 
   user: User, 
+  sessionId: string,
   initiatives: Initiative[], 
   onStartVoting: () => void, 
   onViewMatrix: () => void,
@@ -233,8 +285,6 @@ const Dashboard = ({
     const reader = new FileReader();
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
-      
-      // Melhoria: Lida corretamente com quebras de linha Windows (\r\n) ou Unix (\n)
       const lines = text.split(/\r?\n/).filter(l => l.trim());
       
       if (lines.length < 2) {
@@ -242,11 +292,9 @@ const Dashboard = ({
         return;
       }
       
-      // Melhoria 1: Detecta automaticamente o separador (Brasil usa muito ponto e vírgula)
       const headerLine = lines[0];
       const delimiter = headerLine.includes(';') ? ';' : ',';
 
-      // Melhoria 2: Parser manual robusto que respeita aspas e espaços
       const parseCSVLine = (line: string) => {
         const values: string[] = [];
         let current = '';
@@ -254,31 +302,26 @@ const Dashboard = ({
         
         for (let i = 0; i < line.length; i++) {
           const char = line[i];
-          
           if (char === '"') {
-            // Se encontrar aspas duplas ("") dentro de aspas, é uma aspa literal do Excel
             if (insideQuotes && line[i + 1] === '"') {
               current += '"';
-              i++; // Pula a próxima aspa
+              i++;
             } else {
-              insideQuotes = !insideQuotes; // Entra ou sai do modo aspas
+              insideQuotes = !insideQuotes;
             }
           } else if (char === delimiter && !insideQuotes) {
-            // Se achou o separador e NÃO está entre aspas, fecha a coluna atual
             values.push(current.trim());
             current = '';
           } else {
             current += char;
           }
         }
-        values.push(current.trim()); // Empurra o último valor da linha
+        values.push(current.trim());
         return values;
       };
       
       const parsedData = lines.slice(1).map(line => {
         const values = parseCSVLine(line);
-
-        // Mapeamento baseado no índice (assumindo ordem do template: Team, Metric, Obj, KR, Prio, Name)
         return {
           team: values[0] || 'Geral',
           metric: values[1] || 'N/A',
@@ -291,7 +334,7 @@ const Dashboard = ({
         };
       });
       
-      if (confirm(`Carregar ${parsedData.length} iniciativas? Isso limpará as antigas.`)) {
+      if (confirm(`Carregar ${parsedData.length} iniciativas na sessão "${sessionId}"? Isso limpará as antigas.`)) {
         onUploadCSV(parsedData);
       }
     };
@@ -307,8 +350,11 @@ const Dashboard = ({
       <div className="p-6 max-w-6xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-[#8d7041] uppercase tracking-wider bg-white border border-[#8d7041]/20 px-2 py-1 rounded">Sessão: {sessionId}</span>
+            </div>
             <h1 className="text-4xl font-bold text-[#09247c] font-display tracking-tight">Olá, {user.name}</h1>
-            <p className="text-[#8d7041] font-medium mt-1">Time: <span className="font-bold px-2 py-0.5 bg-[#ffce00]/20 rounded text-[#09247c]">{user.team}</span></p>
+            <p className="text-[#8d7041] font-medium">Time: <span className="font-bold px-2 py-0.5 bg-[#ffce00]/20 rounded text-[#09247c]">{user.team}</span></p>
           </div>
           <div className="flex gap-3">
             <input 
@@ -462,7 +508,6 @@ const VotingSession = ({
       });
   }, [initiatives, user]);
 
-  // FIX: Removido estado de índice. Como a queue remove itens votados, sempre pegamos o primeiro.
   const [impact, setImpact] = useState(50);
   const [complexity, setComplexity] = useState(50);
 
@@ -471,12 +516,11 @@ const VotingSession = ({
   useEffect(() => {
     setImpact(50);
     setComplexity(50);
-  }, [currentItem]); // Reset sliders on new item
+  }, [currentItem]); 
 
   const handleSubmitVote = () => {
     if (!currentItem) return;
     onVote(currentItem.id, impact, complexity);
-    // FIX: Não incrementamos índice manualmente, pois o item sairá da queue automaticamente ao receber o voto
   };
 
   if (!currentItem) {
@@ -497,7 +541,6 @@ const VotingSession = ({
     );
   }
 
-  // Weight logic display
   const isDiretoria = user.team === 'Diretoria';
   const isTeamOwner = user.team === currentItem.team;
 
@@ -691,13 +734,20 @@ const MatrixResult = ({
                 className="absolute group transform -translate-x-1/2 -translate-y-1/2 hover:z-50 transition-all hover:scale-125 focus:outline-none"
                 style={{
                    left: `${item.avgComplexity}%`,
-                   bottom: `${item.avgImpact}%` // Using bottom because chart 0,0 is bottom-left
+                   bottom: `${item.avgImpact}%`
                 }}
               >
+                {/* MELHORIA: Cores Semânticas
+                  Alta -> Vermelho (red-500)
+                  Média -> Amarelo (yellow-400) com texto escuro para contraste
+                  Baixa -> Verde (green-500)
+                */}
                 <div className={`
                   w-8 h-8 rounded-full shadow-lg border-2 border-white 
-                  flex items-center justify-center text-[10px] font-bold text-[#09247c]
-                  ${item.priority === 'Alta' ? 'bg-[#ffce00]' : item.priority === 'Média' ? 'bg-[#8d7041] text-white' : 'bg-[#09247c] text-white'}
+                  flex items-center justify-center text-[10px] font-bold
+                  ${item.priority === 'Alta' ? 'bg-red-500 text-white' : 
+                    item.priority === 'Média' ? 'bg-yellow-400 text-slate-900' : 
+                    'bg-green-500 text-white'}
                 `}>
                   {item.team.substring(0, 2)}
                 </div>
@@ -776,14 +826,13 @@ const MatrixResult = ({
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'login' | 'dashboard' | 'voting' | 'matrix'>('login');
+  const [sessionId, setSessionId] = useState<string>(''); // Novo estado para Sessão
+  const [view, setView] = useState<'session' | 'login' | 'dashboard' | 'voting' | 'matrix'>('session');
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Auth Listener
   useEffect(() => {
-    // Basic auth logic specifically for this component in this environment
-    // In a real deployed app, persistent auth state handles this better
     const initAuth = async () => {
       try {
         await signInAnonymously(auth);
@@ -793,31 +842,34 @@ export default function App() {
     };
     initAuth();
     
-    // We only use auth state to enable database connection, 
-    // user profile is local state for this specific dynamic session
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u) {
          setLoading(false);
-         // Restore session if needed, but for this dynamic we want fresh login usually
-         // or stored in localStorage
-         const saved = localStorage.getItem('prioriza_user');
-         if (saved) {
-           setUser(JSON.parse(saved));
+         // Tenta recuperar sessão e usuário do localStorage
+         const savedSession = localStorage.getItem('prioriza_session_id');
+         const savedUser = localStorage.getItem('prioriza_user');
+         
+         if (savedSession) setSessionId(savedSession);
+         if (savedUser && savedSession) {
+           setUser(JSON.parse(savedUser));
            setView('dashboard');
+         } else if (savedSession) {
+           setView('login');
+         } else {
+           setView('session');
          }
       }
     });
     return unsubscribe;
   }, []);
 
-  // Data Listener
+  // Data Listener (Depende do sessionId agora)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !sessionId) return;
 
-    // RULE 1: Strict path for public data in this environment
-    const collRef = collection(db, 'artifacts', appId, 'public', 'data', 'initiatives');
+    // MELHORIA: Caminho do banco agora usa o sessionId para isolar dados
+    const collRef = collection(db, 'artifacts', sessionId, 'public', 'data', 'initiatives');
     
-    // RULE 2: No complex queries. Fetch all and filter/sort in memory.
     const unsubscribe = onSnapshot(collRef, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -829,7 +881,13 @@ export default function App() {
     });
 
     return unsubscribe;
-  }, [user]);
+  }, [user, sessionId]);
+
+  const handleJoinSession = (id: string) => {
+    setSessionId(id);
+    localStorage.setItem('prioriza_session_id', id);
+    setView('login');
+  };
 
   const handleLogin = (name: string, team: Team) => {
     if (auth.currentUser) {
@@ -841,14 +899,10 @@ export default function App() {
   };
 
   const handleUploadCSV = async (data: any[]) => {
-    if (!user) return;
+    if (!user || !sessionId) return;
     
-    // Batch write workaround (map promises)
-    const collRef = collection(db, 'artifacts', appId, 'public', 'data', 'initiatives');
-    
-    // Optional: Delete old ones first? For this simple app, we might just add. 
-    // Ideally we'd wipe the collection but that requires listing and deleting all docs.
-    // Let's assume we append or user manages ID. For now, just add.
+    // Caminho dinâmico com sessionId
+    const collRef = collection(db, 'artifacts', sessionId, 'public', 'data', 'initiatives');
     
     for (const item of data) {
       await addDoc(collRef, item);
@@ -856,7 +910,7 @@ export default function App() {
   };
 
   const handleVote = async (id: string, impact: number, complexity: number) => {
-    if (!user) return;
+    if (!user || !sessionId) return;
 
     const vote: Vote = {
       userId: user.uid,
@@ -867,7 +921,8 @@ export default function App() {
       timestamp: Date.now()
     };
 
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'initiatives', id);
+    // Caminho dinâmico com sessionId
+    const docRef = doc(db, 'artifacts', sessionId, 'public', 'data', 'initiatives', id);
     await updateDoc(docRef, {
       votes: arrayUnion(vote)
     });
@@ -875,11 +930,14 @@ export default function App() {
 
   if (loading) return <div className="h-screen flex items-center justify-center text-slate-400">Carregando...</div>;
 
-  if (view === 'login') return <Login onLogin={handleLogin} />;
+  if (view === 'session') return <SessionEntry onJoinSession={handleJoinSession} />;
+
+  if (view === 'login') return <Login sessionId={sessionId} onLogin={handleLogin} />;
   
   if (view === 'dashboard' && user) return (
     <Dashboard 
-      user={user} 
+      user={user}
+      sessionId={sessionId}
       initiatives={initiatives} 
       onStartVoting={() => setView('voting')} 
       onViewMatrix={() => setView('matrix')}
