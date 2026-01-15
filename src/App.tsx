@@ -882,6 +882,27 @@ const MatrixResult = ({
     });
   }, [plottedData, filterTeam, filterPriority]);
 
+  // Lógica de Normalização (Zoom Relativo)
+  const normalization = useMemo(() => {
+    if (filteredData.length === 0) return { minI: 0, maxI: 100, minC: 0, maxC: 100 };
+
+    const impacts = filteredData.map(d => d.avgImpact);
+    const complexities = filteredData.map(d => d.avgComplexity);
+
+    return {
+      minI: Math.min(...impacts),
+      maxI: Math.max(...impacts),
+      minC: Math.min(...complexities),
+      maxC: Math.max(...complexities)
+    };
+  }, [filteredData]);
+
+  const getNormalizedPosition = (val: number, min: number, max: number) => {
+    if (max === min) return 50; // Centraliza se todos forem iguais
+    // Mapeia para 5% a 95% para não colar na borda
+    return 5 + ((val - min) / (max - min)) * 90;
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#f8f9fa] overflow-hidden">
       <GlobalStyles />
@@ -894,7 +915,7 @@ const MatrixResult = ({
            <div>
              <h1 className="text-xl font-bold font-display">Matriz Esforço x Impacto</h1>
              <div className="text-xs text-[#ffce00]/80">
-               {filteredData.length} de {plottedData.length} iniciativas
+               {filteredData.length} de {plottedData.length} iniciativas (Vista Normalizada)
              </div>
            </div>
         </div>
@@ -936,47 +957,62 @@ const MatrixResult = ({
           {/* Chart Container */}
           <div className="relative w-[800px] h-[600px] border-l-4 border-b-4 border-[#09247c]">
             
-            {/* Axis Labels */}
-            <div className="absolute -left-12 top-1/2 -rotate-90 font-bold text-[#09247c] tracking-widest text-sm font-display">IMPACTO</div>
-            <div className="absolute bottom-[-40px] left-1/2 font-bold text-[#09247c] tracking-widest text-sm font-display">COMPLEXIDADE (Esforço)</div>
+            {/* Axis Labels - Agora indicando que é relativo */}
+            <div className="absolute -left-12 top-1/2 -rotate-90 font-bold text-[#09247c] tracking-widest text-sm font-display text-center">
+              IMPACTO<br/>
+              <span className="text-[10px] opacity-50">({normalization.minI.toFixed(1)} - {normalization.maxI.toFixed(1)})</span>
+            </div>
+            <div className="absolute bottom-[-45px] left-1/2 font-bold text-[#09247c] tracking-widest text-sm font-display text-center transform -translate-x-1/2">
+              COMPLEXIDADE (Esforço)<br/>
+              <span className="text-[10px] opacity-50">({normalization.minC.toFixed(1)} - {normalization.maxC.toFixed(1)})</span>
+            </div>
 
             {/* Quadrant Backgrounds */}
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 opacity-50 pointer-events-none">
               <div className="bg-green-50/30 border-r border-b border-dashed border-[#09247c]/20 flex p-4 text-[#09247c]/10 font-bold text-4xl uppercase select-none font-display">Quick Wins</div>
               <div className="bg-[#ffce00]/10 border-b border-dashed border-[#09247c]/20 flex p-4 justify-end text-[#09247c]/10 font-bold text-4xl uppercase select-none font-display">Grandes Projetos</div>
               <div className="bg-slate-50/50 border-r border-dashed border-[#09247c]/20 flex items-end p-4 text-[#09247c]/10 font-bold text-4xl uppercase select-none font-display">Fill-ins</div>
               <div className="bg-red-50/30 flex items-end justify-end p-4 text-[#09247c]/10 font-bold text-4xl uppercase select-none font-display">Ingratas</div>
             </div>
 
-            {/* Plot Points (Filtered) */}
-            {filteredData.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setSelectedInitiative(item)}
-                className="absolute group transform -translate-x-1/2 -translate-y-1/2 hover:z-50 transition-all hover:scale-125 focus:outline-none"
-                style={{
-                   left: `${item.avgComplexity}%`,
-                   bottom: `${item.avgImpact}%`
-                }}
-              >
-                {/* Cores Semânticas Reforçadas */}
-                <div className={`
-                  w-8 h-8 rounded-full shadow-lg border-2 border-white 
-                  flex items-center justify-center text-[10px] font-bold
-                  ${item.priority === 'Alta' ? 'bg-red-500 text-white' : 
-                    item.priority === 'Média' ? 'bg-yellow-400 text-slate-900' : 
-                    'bg-green-500 text-white'}
-                `}>
-                  {item.team.substring(0, 2)}
-                </div>
-                
-                {/* Tooltip on Hover */}
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-48 bg-[#09247c] text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center font-bold shadow-xl">
-                  {item.name}
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#09247c] rotate-45"></div>
-                </div>
-              </button>
-            ))}
+            {/* Plot Points (Filtered & Normalized) */}
+            {filteredData.map(item => {
+              // Calcular posições normalizadas
+              const normLeft = getNormalizedPosition(item.avgComplexity, normalization.minC, normalization.maxC);
+              const normBottom = getNormalizedPosition(item.avgImpact, normalization.minI, normalization.maxI);
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setSelectedInitiative(item)}
+                  className="absolute group transform -translate-x-1/2 -translate-y-1/2 hover:z-50 transition-all hover:scale-125 focus:outline-none"
+                  style={{
+                     left: `${normLeft}%`,
+                     bottom: `${normBottom}%`
+                  }}
+                >
+                  {/* Cores Semânticas Reforçadas */}
+                  <div className={`
+                    w-8 h-8 rounded-full shadow-lg border-2 border-white 
+                    flex items-center justify-center text-[10px] font-bold
+                    ${item.priority === 'Alta' ? 'bg-red-500 text-white' : 
+                      item.priority === 'Média' ? 'bg-yellow-400 text-slate-900' : 
+                      'bg-green-500 text-white'}
+                  `}>
+                    {item.team.substring(0, 2)}
+                  </div>
+                  
+                  {/* Tooltip on Hover */}
+                  <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-48 bg-[#09247c] text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center font-bold shadow-xl">
+                    {item.name}
+                    <div className="text-[10px] font-normal opacity-80 mt-1">
+                      Imp: {item.avgImpact.toFixed(1)} | Cplx: {item.avgComplexity.toFixed(1)}
+                    </div>
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#09247c] rotate-45"></div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
